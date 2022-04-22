@@ -1,0 +1,382 @@
+---
+title: "TEMPLE model: simulation for the third scenario (energy transition and slow economic growth)"
+author: "Pierre Jacques"
+date: "22/04/2022"
+
+* An explanation for the equations and the calibration of the model can be found in the appendix of the article: Macroeconomic dynamics of the energy transition: a global, biophysical, stock-flow consistent model
+---
+
+```{r eval=FALSE, echo=TRUE}
+
+library(deSolve)
+library(rootSolve)
+library(sysde)
+library(scatterplot3d)
+
+tderiv <- c("1",
+            "p_5_POP_dot(t+1)",
+            "epsilon_f * epsilon_f_hat",
+            "epsilon_f_if * epsilon_f_if_hat",
+            "epsilon_f_ie * epsilon_f_ie_hat",
+            "epsilon_f_c_fg * epsilon_f_c_fg_hat",
+            "epsilon_f_c_fs * epsilon_f_c_fs_hat",
+            "epsilon_f_cons * epsilon_f_cons_hat",
+            "theta_g * theta_g_hat",
+            "theta_s * theta_s_hat",
+            "K_e * (k_hat_e - k_hat_f)",
+            "P_e * (p_hat_e - p_hat_f)",
+            "omega_f * (omega_0  + omega_1*lambda - omega_3*p_hat_f - alpha_0 - alpha_1*lambda)",
+            "omega_e * (omega_0  + omega_1*lambda - omega_3*p_hat_f + (p_hat_f-p_hat_e) - alpha_0 - alpha_1*lambda )",
+            "if (u_f<1) {lambda_f * ( k_hat_f + upsilon_f/u_f - alpha_0 - alpha_1*lambda - p_5_POP_hat(t+1) )} else {lambda_f * ( k_hat_f + min(upsilon_f,0)/u_f - alpha_0 - alpha_1*lambda - p_5_POP_hat(t+1) )}",
+            "lambda_e * ( k_hat_e - alpha_0 - alpha_1*lambda - p_5_POP_hat(t+1) )",
+            "if (u_f<1) {upsilon_f} else {min(upsilon_f,0)}",
+            "u_f/gamma_f - ( K_e*(k_hat_e+delta_e) + k_hat_f + delta_f + kappa_hf + kappa_cf ) - (k_hat_f+delta_n)*nu_f",
+            "k_hat_f - pi_f + div*pi_fe - d_f*(p_hat_f + k_hat_f)",
+            "k_hat_e - pi_e + div*pi_e - d_e*(p_hat_f + k_hat_e)",
+            "beta_r * (r_T - r)",
+            "pi_bu - of_b*(k_hat_f+p_hat_f)",
+            "0.25 * chi * (1-chi)",  # chi evolves according to a sigmoid curve
+            "k_f * k_hat_f",
+            "(1-chi) * K_e*k_f*u_e/gamma_e*1e-9",
+            "0.4 * xi * (0.95-xi)") # xi serves to impose a decrease in the investment of final goods firms
+
+y <- c(t=0,
+       POP = 7805529125,
+       epsilon_f = 0.001935,
+       epsilon_f_if = 0.002801,
+       epsilon_f_ie = 0.005068,
+       epsilon_f_c_fg = 0.003669,
+       epsilon_f_c_fs = 0.001152,
+       epsilon_f_cons = 0.00239,
+       theta_g = 0.189,
+       theta_s = 0.811,
+       K_e = 0.0488,      
+       P_e = 10.49449,        
+       omega_f = 0.68366, 
+       omega_e = 0.00847,  
+       lambda_f = 0.42854, 
+       lambda_e = 0.008457, 
+       u_f_e = 0.8189,
+       nu_f = 0.01446,
+       d_f = 0.27594,      
+       d_e = 0.24373,       
+       r = 0.0242,          
+       of_b = 0.02527,
+       chi = 0.03,
+       k_f = 2.849533e+14,
+       cum_y_nre = 0,
+       xi = 0.02)
+
+parms <- c(epsilon_f_hat = -0.0056,
+           epsilon_f_if_hat = -0.005887,
+           epsilon_f_ie_hat = -0.01689,
+           epsilon_f_c_fg_hat = -0.009593,
+           epsilon_f_c_fs_hat = -0.008393,
+           epsilon_f_cons_hat = -0.023548,
+           theta_g_hat = 0,
+           theta_s_hat = 0,
+           omega_0 = -0.09174, 
+           omega_1 = 0.27,
+           omega_3 = 0.4,             
+           alpha_0 = -0.01616,
+           alpha_1 = 0.08,    
+           POP_hat = 0.011,
+           gamma_f = 2.55,
+           gamma_nre = 24.98478, # gamma_e(2019) = 30.93755, 
+           epsilon_nre = 0.1040629, # epsilon_e(2019) = 0.103545,
+           epsilon_re = 0.0868,
+           delta_f = 0.05,
+           delta_e = 0.04,
+           delta_n = 0.183,
+           div = 0.49328,   
+           beta_r = 0.08,               
+           lambda_b = 5.1768359,              
+           mu_b = 0.0886,
+           beta_pf1 = 1.32153,
+           beta_pf2 = 1.53398, 
+           beta_nf1 = 1.23415,              
+           beta_nf2 = 0.1,
+           mu_f = 1.1741, 
+           mu_e = 1.27079,
+           kappa_f0 = 0.02,
+           kappa_f1 = 0.25445,  
+           eta = 0.058368,
+           s_c = 0.3063,
+           alpha_ratio = 0.130026,
+           beta_pe = 2.5616,               
+           beta_ie = 3,  
+           u_eT = 0.9163178,  
+           T_e0 = 0.3539,
+           r_star = 0.00558,             
+           phi = 0.4,                   
+           p_hat_fT = 0.01862,        
+           lambda_rT = 0.018,
+           A = 6.50,
+           B = 0.00002)   
+
+f_ce <- function(P_e) { # f_ce links energy consumption to final goods consumption for households
+  return( 0.9 * (3.2/P_e + 0.84) * 1.4633 * 0.8047753 )
+}
+
+p_5 <- function(y_re) { # p_5 is a fifth order polynomial approximation of the curve of capital intensity of renewable energy production
+  return( 1.0431e-13*y_re^5 - 6.20369e-10*y_re^4 + 1.43287e-06*y_re^3 - 0.00159946*y_re^2 + 0.940805*y_re + 211.544 )
+}
+
+p_5_POP_dot <- function(t) {
+  return( -4.52628902e-2*t^5 + 7.43469740*t^4 - 1.74076870e+02*t^3 - 1.33532952e+04*t^2 - 1.36213334e+06*t + 8.26772590e+07)
+}
+
+p_5_POP_hat <- function(t) {
+  return( -3.80140466e-12*t^5 + 7.18280199e-10*t^4 - 4.50017564e-08*t^3 + 2.12900015e-06*t^2 - 2.91051677e-04*t + 1.07042358e-02)
+}
+
+times <- seq(0,34, 0.01)
+
+omega_0 <- parms["omega_0"]
+omega_1 <- parms["omega_1"]
+omega_3 <- parms["omega_3"]
+alpha_0 <- parms["alpha_0"]
+alpha_1 <- parms["alpha_1"]
+POP_hat <- parms["POP_hat"]
+gamma_f <- parms["gamma_f"]
+gamma_nre <- parms["gamma_nre"]
+epsilon_nre <- parms["epsilon_nre"]
+epsilon_re <- parms["epsilon_re"]
+delta_f <- parms["delta_f"]
+delta_e <- parms["delta_e"]
+delta_n <- parms["delta_n"]
+div <- parms["div"]
+beta_r <- parms["beta_r"]
+lambda_b <- parms["lambda_b"]
+mu_b <- parms["mu_b"]
+beta_pf1 <- parms["beta_pf1"]
+beta_pf2 <- parms["beta_pf2"]
+beta_pf3 <- parms["beta_pf3"]
+beta_nf1 <- parms["beta_nf1"]
+beta_nf2 <- parms["beta_nf2"]
+beta_nf3 <- parms["beta_nf3"]
+mu_f <- parms["mu_f"]
+mu_e <- parms["mu_e"]
+kappa_f0 <- parms["kappa_f0"]
+kappa_f1 <- parms["kappa_f1"]
+eta <- parms["eta"]
+s_c <- parms["s_c"]
+alpha_ratio <- parms["alpha_ratio"]
+beta_pe <- parms["beta_pe"]
+beta_ie <- parms["beta_ie"]
+u_eT <- parms["u_eT"]
+T_e0 <- parms["T_e0"]
+beta_r <- parms["beta_r"]
+r_star <- parms["r_star"]
+phi <- parms["phi"]
+p_hat_fT <- parms["p_hat_fT"]
+lambda_rT <- parms["lambda_rT"]
+A <- parms["A"]
+B <- parms["B"]
+
+intermediateVar <- c(EROI_nre = "1 + A*exp(-B*cum_y_nre)",
+                     epsilon_e = "(1-chi)*epsilon_nre*7.50/EROI_nre + chi*epsilon_re",
+                     lambda = "lambda_f + lambda_e",
+                     pi_bu = "lambda_b * (mu_b*(d_f+K_e*d_e) - of_b)",
+                     u_f = "u_f_e + beta_nf2 * (eta*u_f_e - gamma_f*nu_f)",
+                     uc_f_first = "omega_f + epsilon_f*P_e + gamma_f*delta_f/u_f",
+                     pi_fe_first = "u_f/gamma_f*(1-uc_f_first) - r*d_f",
+                     k_hat_f_target = "kappa_f0*(1-xi)/0.98 + kappa_f1*pi_fe_first",
+                     kappa_hf_target = "omega_f / (P_e*epsilon_f_cons*f_ce(P_e) + 1) * (u_f/gamma_f + alpha_ratio*K_e)",
+                     kappa_cf_target_first = "(1 - s_c) * (div*pi_fe_first + r*(d_f+K_e*d_e) - pi_bu)",
+                     gamma_e_target_first = "(1-chi)*gamma_nre*7.50/EROI_nre + chi*p_5( chi * k_f / (1-epsilon_e) * (epsilon_f*u_f/gamma_f + epsilon_f_cons*f_ce(P_e)*(kappa_hf_target + kappa_cf_target_first)) * 1e-9 ) * (1 + chi/9)",
+                     u_e_target_first = "gamma_e_target_first / ((1-epsilon_e)*K_e) * (epsilon_f*u_f/gamma_f + epsilon_f_cons*f_ce(P_e)*(kappa_hf_target + kappa_cf_target_first))",
+                     uc_e_target_first = "min(omega_e*gamma_e_target_first/u_e_target_first + epsilon_e + gamma_e_target_first*delta_e/(P_e*u_e_target_first), 0.5391434)", # unit cost of energy production is capped thanks to government subsidies in order to cap inflation in the energy price
+                     pi_e_target = "P_e*u_e_target_first/gamma_e_target_first * (1-uc_e_target_first-T_e0) - 0.01*d_e", # The debt of energy firms is guaranteed by the state so that they benefit from an interest rate of 1%
+                     kappa_cf_target = "(1 - s_c) * (div*pi_fe_first + K_e*div*pi_e_target + r*(d_f+K_e*d_e) - pi_bu)",
+                     gamma_e_target = "(1-chi)*gamma_nre*7.50/EROI_nre + chi*p_5( chi * k_f / (1-epsilon_e) * (epsilon_f*u_f/gamma_f + epsilon_f_cons*f_ce(P_e)*(kappa_hf_target + kappa_cf_target)) * 1e-9 ) * (1 + chi/9)",
+                     u_e_target = "gamma_e_target / ((1-epsilon_e)*K_e) * (epsilon_f*u_f/gamma_f + epsilon_f_cons*f_ce(P_e)*(kappa_hf_target + kappa_cf_target))",
+                     k_hat_e_target = "max(beta_ie * ( u_e_target/u_eT - 1 ), 0)",
+                     mismatch = "if (nu_f<=0) { max(K_e*(k_hat_e_target+delta_e) + k_hat_f_target + delta_f + kappa_hf_target + kappa_cf_target - u_f/gamma_f, 0) } else { 0 }",
+                     k_hat_f = "k_hat_f_target",
+                     kappa_cf = "kappa_cf_target - mismatch/4",
+                     kappa_hf = "kappa_hf_target - mismatch * 3/4",
+                     k_hat_e = "k_hat_e_target",
+                     share_epsilon_f_if = "(k_hat_f + delta_f) * gamma_f/u_f",
+                     share_epsilon_f_ie = "(k_hat_e + delta_e) * K_e * gamma_f/u_f",
+                     epsilon_f_crafted = "share_epsilon_f_if * epsilon_f_if + share_epsilon_f_ie * epsilon_f_ie + (1 - share_epsilon_f_if - share_epsilon_f_ie) * (theta_g * epsilon_f_c_fg + theta_s * epsilon_f_c_fs)",
+                     uc_f = "omega_f + epsilon_f_crafted*P_e + gamma_f*delta_f/u_f",
+                     pi_fe = "u_f/gamma_f*(1-uc_f) - r*d_f",
+                     gamma_e = "(1-chi)*gamma_nre*7.50/EROI_nre + chi*p_5( chi * k_f / (1-epsilon_e) * (epsilon_f_crafted*u_f/gamma_f + epsilon_f_cons*f_ce(P_e)*(kappa_hf + kappa_cf)) * 1e-9 ) * (1 + chi/9)",
+                     u_e = "gamma_e / ((1-epsilon_e)*K_e) * (epsilon_f_crafted*u_f/gamma_f + epsilon_f_cons*f_ce(P_e)*(kappa_hf + kappa_cf))",
+                     uc_e = "min(omega_e*gamma_e/u_e + epsilon_e + gamma_e*delta_e/(P_e*u_e), 0.5391434)", # unit cost of energy production is capped thanks to government subsidies in order to cap inflation in the energy price
+                     p_hat_e = "beta_pe * (mu_e*uc_e + T_e0 - 1)",
+                     pi_e = "P_e*u_e/gamma_e * (1-uc_e-T_e0) - 0.01*d_e", # The debt of energy firms is guaranteed by the state so that they benefit from an interest rate of 1%
+                     pi_f = "K_e*(k_hat_e+delta_e) + k_hat_f + delta_f + kappa_hf + kappa_cf - u_f/gamma_f*uc_f - r*d_f",
+                     upsilon_f = "beta_nf1 * (gamma_f*(K_e*(k_hat_e+delta_e) + k_hat_f + delta_f + kappa_hf + kappa_cf + delta_n*nu_f) - u_f_e)",
+                     p_hat_f = "beta_pf1 * (mu_f*uc_f - 1) + beta_pf2 * (eta*u_f/gamma_f - nu_f)",
+                     r_CB = "r_star + p_hat_f + phi*(p_hat_f-p_hat_fT)",
+                     r_T = "r_CB + lambda_rT * (mu_b*(d_f+K_e*d_e) - of_b)/(mu_b*(d_f+K_e*d_e))")
+                     
+sys <- sysde.model(tderiv, y, parms, times, intermediateVar, jacobian=FALSE)
+simul <- sysde.simul(sys)
+
+t = simul$baseline[,1]
+POP = simul$baseline[,3]
+epsilon_f = simul$baseline[,4]
+epsilon_f_if = simul$baseline[,5]
+epsilon_f_ie = simul$baseline[,6]
+epsilon_f_c_fg = simul$baseline[,7]
+epsilon_f_c_fs = simul$baseline[,8]
+epsilon_f_cons = simul$baseline[,9]
+theta_g = simul$baseline[,10]
+theta_s = simul$baseline[,11]
+K_e = simul$baseline[,12]
+P_e = simul$baseline[,13]
+omega_f = simul$baseline[,14]
+omega_e = simul$baseline[,15]
+lambda_f = simul$baseline[,16]
+lambda_e = simul$baseline[,17]
+u_f_e = simul$baseline[,18]
+nu_f = simul$baseline[,19]
+d_f = simul$baseline[,20]
+d_e = simul$baseline[,21]
+r = simul$baseline[,22]
+of_b = simul$baseline[,23]
+chi = simul$baseline[,24]
+k_f = simul$baseline[,25]
+cum_y_nre = simul$baseline[,26]
+xi = simul$baseline[,27]
+
+EROI_nre = 1 + A*exp(-B*cum_y_nre)
+epsilon_e = (1-chi)*epsilon_nre*7.50/EROI_nre + chi*epsilon_re
+lambda = lambda_f + lambda_e
+pi_bu = lambda_b * (mu_b*(d_f+K_e*d_e) - of_b)
+u_f = u_f_e + beta_nf2 * (eta*u_f_e - gamma_f*nu_f)
+uc_f_first = omega_f + epsilon_f*P_e + gamma_f*delta_f/u_f
+pi_fe_first = u_f/gamma_f*(1-uc_f_first) - r*d_f
+k_hat_f_target = kappa_f0*(1-xi)/0.98 + kappa_f1*pi_fe_first
+kappa_hf_target = omega_f / (P_e*epsilon_f_cons*f_ce(P_e) + 1) * (u_f/gamma_f + alpha_ratio*K_e)
+kappa_cf_target_first = (1 - s_c) * (div*pi_fe_first + r*(d_f+K_e*d_e) - pi_bu)
+gamma_e_target_first = (1-chi)*gamma_nre*7.50/EROI_nre + chi*p_5( chi * k_f / (1-epsilon_e) * (epsilon_f*u_f/gamma_f + epsilon_f_cons*f_ce(P_e)*(kappa_hf_target + kappa_cf_target_first)) * 1e-9 ) * (1 + chi/9)
+u_e_target_first = gamma_e_target_first / ((1-epsilon_e)*K_e) * (epsilon_f*u_f/gamma_f + epsilon_f_cons*f_ce(P_e)*(kappa_hf_target + kappa_cf_target_first))
+uc_e_target_first = omega_e*gamma_e_target_first/u_e_target_first + epsilon_e + gamma_e_target_first*delta_e/(P_e*u_e_target_first) * (1 + chi/9)
+uc_e_target_first = (uc_e_target_first < 0.5391434) * uc_e_target_first + (uc_e_target_first >= 0.5391434) * 0.5391434 # unit cost of energy production is capped thanks to government subsidies in order to cap inflation in the energy price
+pi_e_target = P_e*u_e_target_first/gamma_e_target_first * (1-uc_e_target_first-T_e0) - 0.01*d_e # The debt of energy firms is guaranteed by the state so that they benefit from an interest rate of 1%
+kappa_cf_target = (1 - s_c) * (div*pi_fe_first + K_e*div*pi_e_target + r*(d_f+K_e*d_e) - pi_bu)
+gamma_e_target = (1-chi)*gamma_nre*7.50/EROI_nre + chi*p_5( chi * k_f / (1-epsilon_e) * (epsilon_f*u_f/gamma_f + epsilon_f_cons*f_ce(P_e)*(kappa_hf_target + kappa_cf_target)) * 1e-9 ) * (1 + chi/9)
+u_e_target = gamma_e_target / ((1-epsilon_e)*K_e) * (epsilon_f*u_f/gamma_f + epsilon_f_cons*f_ce(P_e)*(kappa_hf_target + kappa_cf_target))
+k_hat_e_target = beta_ie * ( u_e_target/u_eT - 1 )
+k_hat_e_target = k_hat_e_target * (k_hat_e_target > 0)
+mismatch = K_e*(k_hat_e_target+delta_e) + k_hat_f_target + delta_f + kappa_hf_target + kappa_cf_target - u_f/gamma_f
+mismatch = mismatch * (mismatch>=0) * (nu_f<=0)
+k_hat_f = k_hat_f_target
+kappa_cf = kappa_cf_target - mismatch/4
+kappa_hf = kappa_hf_target - mismatch * 3/4
+k_hat_e = k_hat_e_target
+share_epsilon_f_if = (k_hat_f + delta_f) * gamma_f/u_f
+share_epsilon_f_ie = (k_hat_e + delta_e) * K_e * gamma_f/u_f
+epsilon_f_crafted = share_epsilon_f_if * epsilon_f_if + share_epsilon_f_ie * epsilon_f_ie + (1 - share_epsilon_f_if - share_epsilon_f_ie) * (theta_g * epsilon_f_c_fg + theta_s * epsilon_f_c_fs)
+uc_f = omega_f + epsilon_f_crafted*P_e + gamma_f*delta_f/u_f
+pi_fe = u_f/gamma_f*(1-uc_f) - r*d_f
+gamma_e = (1-chi)*gamma_nre*7.50/EROI_nre + chi*p_5( chi * k_f / (1-epsilon_e) * (epsilon_f_crafted*u_f/gamma_f + epsilon_f_cons*f_ce(P_e)*(kappa_hf + kappa_cf)) * 1e-9 )  * (1 + chi/9)
+u_e = gamma_e / ((1-epsilon_e)*K_e) * (epsilon_f_crafted*u_f/gamma_f + epsilon_f_cons*f_ce(P_e)*(kappa_hf + kappa_cf))
+uc_e = omega_e*gamma_e/u_e + epsilon_e + gamma_e*delta_e/(P_e*u_e)
+uc_e = (uc_e < 0.5391434) * uc_e + (uc_e >= 0.5391434) * 0.5391434 # unit cost of energy production is capped thanks to government subsidies in order to cap inflation in the energy price
+p_hat_e = beta_pe * (mu_e*uc_e + T_e0 - 1)
+pi_e = P_e*u_e/gamma_e * (1-uc_e-T_e0) - 0.01*d_e # The debt of energy firms is guaranteed by the state so that they benefit from an interest rate of 1%
+pi_f = K_e*(k_hat_e+delta_e) + k_hat_f + delta_f + kappa_hf + kappa_cf - u_f/gamma_f*uc_f - r*d_f
+upsilon_f = beta_nf1 * (gamma_f*(K_e*(k_hat_e+delta_e) + k_hat_f + delta_f + kappa_hf + kappa_cf + delta_n*nu_f) - u_f_e)
+p_hat_f = beta_pf1 * (mu_f*uc_f - 1) + beta_pf2 * (eta*u_f/gamma_f - nu_f)
+r_CB = r_star + p_hat_f + phi*(p_hat_f-p_hat_fT)
+r_T = r_CB + lambda_rT * (mu_b*(d_f+K_e*d_e) - of_b)/(mu_b*(d_f+K_e*d_e))
+
+year = 2019+t
+
+
+##################### Plots #####################
+
+matplot(year, k_hat_f, type="l", xlab="Time", ylab="", main="Growth rate of capital stock of final goods firms")
+grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
+
+matplot(year, chi, type="l", xlab="Time", ylab="", main="Degree of progress of the energy transition")
+grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
+
+matplot(year, cbind(epsilon_f_crafted*1000, epsilon_f_if*1000, epsilon_f_ie*1000, epsilon_f_c_fg*1000, epsilon_f_c_fs*1000, epsilon_f_cons*1000), type="l", col=c(1,2,3,4,5,6,7), xlab="", ylab="MJ / 2017 US$", main="Energy intensity of final goods production", ylim=c(0,6))
+legend("topright", legend = c("epsilon_f", "epsilon_f_if", "epsilon_f_ie", "epsilon_f_c_fg", "epsilon_f_c_fs", "epsilon_f_cons"), fill = c(1,2,3,4,5,6,7))
+grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
+
+matplot(year, EROI_nre, type="l", xlab="Time", ylab="", main="EROI of fossil fuels")
+grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
+
+matplot(year, gamma_e, type="l", xlab="Time", , ylab="2017 US$ / (GJ/year)", main="Capital intensity of energy production")
+grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
+
+matplot(year, epsilon_e, type="l", xlab="Time", ylab="", main="Energy intensity of the energy sector")
+grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
+
+y_e = K_e*k_f*u_e/gamma_e*1e-9
+
+matplot(year, y_e, type="l", xlab="Time", ylab="", main="Energy production")
+grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
+
+matplot(year, mismatch * gamma_f/u_f * 100, type="l", xlab="Time", ylab="Percentage of final goods production", main="Mismatch between offer and demand")
+grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
+
+s = ( K_e*(k_hat_e+delta_e) + k_hat_f + delta_f ) / ( K_e*(k_hat_e+delta_e) + k_hat_f + delta_f + (1+P_e*epsilon_f_cons*f_ce(P_e))*(kappa_hf+kappa_cf) )
+
+wage_share = kappa_hf*(1+P_e*epsilon_f_cons*f_ce(P_e)) / ( K_e*(k_hat_e+delta_e) + k_hat_f + delta_f + (1+P_e*epsilon_f_cons*f_ce(P_e))*(kappa_hf+kappa_cf) )
+
+capitalists_share = kappa_cf*(1+P_e*epsilon_f_cons*f_ce(P_e)) / ( K_e*(k_hat_e+delta_e) + k_hat_f + delta_f + (1+P_e*epsilon_f_cons*f_ce(P_e))*(kappa_hf+kappa_cf) )
+
+matplot(year, cbind(wage_share,s,capitalists_share), type="l", xlab="Time", ylab="Fraction of GDP", main="GDP shares", ylim = c(0,1), col=c(1,2,"blue"))
+legend("topleft", legend = c("wage share","saving rate","capitalists share"), fill= c(1,2,"blue"))
+grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
+
+matplot(year, cbind(lambda_f,lambda_e,lambda), type="l", xlab="", ylab="Fraction of total population", main="Employment level")
+legend("bottomleft", legend = c("Final goods sector", "Energy sector","Total"), fill= c(1,2,3))
+grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
+
+matplot(year, cbind(p_hat_f*100, p_hat_e*100), type="l", xlab="Time", ylab="%", main="Inflation")
+legend("bottomright", legend = c("Final goods price","Energy price"), fill= c(1,2))
+grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
+
+matplot(year, cbind(d_f, d_e), type="l", xlab="Time", ylab="", ylim = c(0,1), main="Debt ratios")
+legend("topright", legend = c("Final goods firms", "Energy firms"), fill= c(1,2))
+grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
+
+matplot(year, cbind(k_hat_f, k_hat_e, kappa_hf, kappa_cf), type="l", xlab="Time", ylab="")
+legend("topright", legend = c("k_hat_f", "k_hat_e", "kappa_hf", "kappa_cf"), fill= c(1,2,3,4))
+grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
+
+matplot(year, cbind(u_f,u_e,u_f_e,u_e_target), type="l", xlab="Time", ylab="", main="Utilization rates")
+legend("bottomleft", legend = c("u_f","u_e","u_f_e","u_e_target"), fill= c(1,2,3,4))
+grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
+
+matplot(year, nu_f, type="l", xlab="Time", ylab="", main="Normalized inventory level")
+legend("bottomleft", legend = c("nu_f"), fill= c(1))
+grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
+
+matplot(year, cbind(uc_f, uc_e), type="l", xlab="Time", ylab="", ylim = c(0,1), main="Unit costs of production")
+legend("bottomright", legend = c("uc_f", "uc_e"), fill= c(1,2))
+grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
+
+matplot(year, cbind(r, r_T), type="l", xlab="Time", ylab="", main="Interest rates")
+legend("bottomright", legend = c("r", "r_T"), fill= c(1,2))
+grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
+
+matplot(year, pi_bu, type="l", xlab="Time", ylab="")
+legend("topleft", legend = c("pi_bu"), fill= c(1))
+grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
+
+matplot(year, of_b, type="l", xlab="Time", ylab="")
+legend("topleft", legend = c("of_b"), fill= c(1))
+grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
+
+matplot(year, cbind(pi_f, pi_e), type="l", xlab="Time", ylab="", main="Profit rates", ylim = c(-0.05,0.1))
+legend("topright", legend = c("Final goods firms", "Energy firms"), fill= c(1,2))
+grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
+
+
+
+```
+
+
+
+
+

@@ -79,8 +79,7 @@ parms <- c(epsilon_f_hat = -0.0056,
            omega_1 = 0.27,
            omega_3 = 0.4,             
            alpha_0 = -0.01616,
-           alpha_1 = 0.08,    
-           POP_hat = 0.011,
+           alpha_1 = 0.08, 
            gamma_f = 2.55,
            gamma_nre = 24.98478, # gamma_e(2019) = 30.93755, 
            epsilon_nre = 0.1040629, # epsilon_e(2019) = 0.103545,
@@ -137,7 +136,6 @@ omega_1 <- parms["omega_1"]
 omega_3 <- parms["omega_3"]
 alpha_0 <- parms["alpha_0"]
 alpha_1 <- parms["alpha_1"]
-POP_hat <- parms["POP_hat"]
 gamma_f <- parms["gamma_f"]
 gamma_nre <- parms["gamma_nre"]
 epsilon_nre <- parms["epsilon_nre"]

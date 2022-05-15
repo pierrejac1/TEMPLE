@@ -190,8 +190,8 @@ intermediateVar <- c(EROI_nre = "1 + A*exp(-B*cum_y_nre)",
                      k_hat_e_target = "max(beta_ie * ( u_e_target/u_eT - 1 ), 0)",
                      mismatch = "if (nu_f<=0) { max(K_e*(k_hat_e_target+delta_e) + k_hat_f_target + delta_f + kappa_hf_target + kappa_cf_target - u_f/gamma_f, 0) } else { 0 }",
                      k_hat_f = "k_hat_f_target",
-                     kappa_cf = "kappa_cf_target - mismatch/4",
-                     kappa_hf = "kappa_hf_target - mismatch * 3/4",
+                     kappa_cf = "kappa_cf_target - mismatch * 3/8",
+                     kappa_hf = "kappa_hf_target - mismatch * 5/8",
                      k_hat_e = "k_hat_e_target",
                      share_epsilon_f_if = "(k_hat_f + delta_f) * gamma_f/u_f",
                      share_epsilon_f_ie = "(k_hat_e + delta_e) * K_e * gamma_f/u_f",
@@ -205,7 +205,7 @@ intermediateVar <- c(EROI_nre = "1 + A*exp(-B*cum_y_nre)",
                      pi_e = "P_e*u_e/gamma_e * (1-uc_e-T_e0) - 0.01*d_e", # The debt of energy firms is guaranteed by the state so that they benefit from an interest rate of 1%
                      pi_f = "K_e*(k_hat_e+delta_e) + k_hat_f + delta_f + kappa_hf + kappa_cf - u_f/gamma_f*uc_f - r*d_f",
                      upsilon_f = "beta_nf1 * (gamma_f*(K_e*(k_hat_e+delta_e) + k_hat_f + delta_f + kappa_hf + kappa_cf + delta_n*nu_f) - u_f_e)",
-                     p_hat_f = "beta_pf1 * (mu_f*uc_f - 1) + beta_pf2 * (eta*u_f/gamma_f - nu_f)",
+                     p_hat_f = "beta_pf1 * (mu_f*uc_f - 1) + beta_pf2 * (eta*u_f/gamma_f - nu_f + mismatch)",
                      r_CB = "r_star + p_hat_f + phi*(p_hat_f-p_hat_fT)",
                      r_T = "r_CB + lambda_rT * (mu_b*(d_f+K_e*d_e) - of_b)/(mu_b*(d_f+K_e*d_e))")
                      
@@ -261,8 +261,8 @@ k_hat_e_target = k_hat_e_target * (k_hat_e_target > 0)
 mismatch = K_e*(k_hat_e_target+delta_e) + k_hat_f_target + delta_f + kappa_hf_target + kappa_cf_target - u_f/gamma_f
 mismatch = mismatch * (mismatch>=0) * (nu_f<=0)
 k_hat_f = k_hat_f_target
-kappa_cf = kappa_cf_target - mismatch/4
-kappa_hf = kappa_hf_target - mismatch * 3/4
+kappa_cf = kappa_cf_target - mismatch * 3/8
+kappa_hf = kappa_hf_target - mismatch * 5/8
 k_hat_e = k_hat_e_target
 share_epsilon_f_if = (k_hat_f + delta_f) * gamma_f/u_f
 share_epsilon_f_ie = (k_hat_e + delta_e) * K_e * gamma_f/u_f
@@ -277,7 +277,7 @@ p_hat_e = beta_pe * (mu_e*uc_e + T_e0 - 1)
 pi_e = P_e*u_e/gamma_e * (1-uc_e-T_e0) - 0.01*d_e # The debt of energy firms is guaranteed by the state so that they benefit from an interest rate of 1%
 pi_f = K_e*(k_hat_e+delta_e) + k_hat_f + delta_f + kappa_hf + kappa_cf - u_f/gamma_f*uc_f - r*d_f
 upsilon_f = beta_nf1 * (gamma_f*(K_e*(k_hat_e+delta_e) + k_hat_f + delta_f + kappa_hf + kappa_cf + delta_n*nu_f) - u_f_e)
-p_hat_f = beta_pf1 * (mu_f*uc_f - 1) + beta_pf2 * (eta*u_f/gamma_f - nu_f)
+p_hat_f = beta_pf1 * (mu_f*uc_f - 1) + beta_pf2 * (eta*u_f/gamma_f - nu_f + mismatch)
 r_CB = r_star + p_hat_f + phi*(p_hat_f-p_hat_fT)
 r_T = r_CB + lambda_rT * (mu_b*(d_f+K_e*d_e) - of_b)/(mu_b*(d_f+K_e*d_e))
 

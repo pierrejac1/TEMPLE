@@ -1,5 +1,5 @@
 ---
-title: "TEMPLE model: simulation for the first scenario (baseline, no energy transition)"
+title: "TEMPLE model: simulation of the baseline scenario"
 author: "Pierre Jacques"
 date: "22/04/2022"
 
@@ -9,9 +9,7 @@ date: "22/04/2022"
 ```{r eval=FALSE, echo=TRUE}
 
 library(deSolve)
-library(rootSolve)
 library(sysde)
-library(scatterplot3d)
 
 tderiv <- c("1",
             "p_5_POP_dot(t+1)",
@@ -194,8 +192,9 @@ intermediateVar <- c(epsilon_e = "(1-chi)*epsilon_nre + chi*epsilon_re",
                      gamma_e = "(1-chi)*gamma_nre + chi*p_5( chi * k_f / (1-epsilon_e) * (epsilon_f_crafted*u_f/gamma_f + epsilon_f_cons*f_ce(P_e)*(kappa_hf + kappa_cf)) * 1e-9 )",
                      u_e = "gamma_e / ((1-epsilon_e)*K_e) * (epsilon_f_crafted*u_f/gamma_f + epsilon_f_cons*f_ce(P_e)*(kappa_hf + kappa_cf))",
                      uc_e = "omega_e*gamma_e/u_e + epsilon_e + gamma_e*delta_e/(P_e*u_e)",
-                     p_hat_e = "beta_pe * (mu_e*uc_e + T_e0 - 1)",
-                     pi_e = "P_e*u_e/gamma_e * (1-uc_e-T_e0) - r*d_e",
+                     S_e = "max((uc_e-0.5391434)*mu_e, 0)", # Subsidies to the energy firms
+                     p_hat_e = "beta_pe * (mu_e*uc_e + T_e0 - S_e - 1)",
+                     pi_e = "P_e*u_e/gamma_e * (1-uc_e-T_e0+S_e) - r*d_e",
                      pi_f = "K_e*(k_hat_e+delta_e) + k_hat_f + delta_f + kappa_hf + kappa_cf - u_f/gamma_f*uc_f - r*d_f",
                      upsilon_f = "beta_nf1 * (gamma_f*(K_e*(k_hat_e+delta_e) + k_hat_f + delta_f + kappa_hf + kappa_cf + delta_n*nu_f) - u_f_e)",
                      p_hat_f = "beta_pf1 * (mu_f*uc_f - 1) + beta_pf2 * (eta*u_f/gamma_f - nu_f + mismatch)",
@@ -262,8 +261,10 @@ pi_fe = u_f/gamma_f*(1-uc_f) - r*d_f
 gamma_e = (1-chi)*gamma_nre + chi*p_5( chi * k_f / (1-epsilon_e) * (epsilon_f_crafted*u_f/gamma_f + epsilon_f_cons*f_ce(P_e)*(kappa_hf + kappa_cf)) * 1e-9 )
 u_e = gamma_e / ((1-epsilon_e)*K_e) * (epsilon_f_crafted*u_f/gamma_f + epsilon_f_cons*f_ce(P_e)*(kappa_hf + kappa_cf))
 uc_e = omega_e*gamma_e/u_e + epsilon_e + gamma_e*delta_e/(P_e*u_e)
-p_hat_e = beta_pe * (mu_e*uc_e + T_e0 - 1)
-pi_e = P_e*u_e/gamma_e * (1-uc_e-T_e0) - r*d_e
+S_e = (uc_e-0.5391434)*mu_e 
+S_e = S_e * (S_e>=0)
+p_hat_e = beta_pe * (mu_e*uc_e + T_e0 - S_e - 1)
+pi_e = P_e*u_e/gamma_e * (1-uc_e-T_e0+S_e) - r*d_e
 pi_f = K_e*(k_hat_e+delta_e) + k_hat_f + delta_f + kappa_hf + kappa_cf - u_f/gamma_f*uc_f - r*d_f
 upsilon_f = beta_nf1 * (gamma_f*(K_e*(k_hat_e+delta_e) + k_hat_f + delta_f + kappa_hf + kappa_cf + delta_n*nu_f) - u_f_e)
 p_hat_f = beta_pf1 * (mu_f*uc_f - 1) + beta_pf2 * (eta*u_f/gamma_f - nu_f + mismatch)
@@ -290,21 +291,21 @@ grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
 matplot(year, mismatch * gamma_f/u_f * 100, type="l", xlab="Time", ylab="Percentage of final goods production", main="Mismatch between offer and demand")
 grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
 
-s = ( K_e*(k_hat_e+delta_e) + k_hat_f + delta_f ) / ( K_e*(k_hat_e+delta_e) + k_hat_f + delta_f + (1+P_e*epsilon_f_cons*f_ce(P_e))*(kappa_hf+kappa_cf) )
+wage_share = (kappa_hf + mismatch*5/8) *(1+P_e*epsilon_f_cons*f_ce(P_e)) / ( K_e*(k_hat_e+delta_e) + k_hat_f + delta_f + (1+P_e*epsilon_f_cons*f_ce(P_e))*(kappa_hf+kappa_cf) )
 
-wage_share = kappa_hf*(1+P_e*epsilon_f_cons*f_ce(P_e)) / ( K_e*(k_hat_e+delta_e) + k_hat_f + delta_f + (1+P_e*epsilon_f_cons*f_ce(P_e))*(kappa_hf+kappa_cf) )
+profit_share = ( pi_f + K_e*pi_e ) / ( K_e*(k_hat_e+delta_e) + k_hat_f + delta_f + (1+P_e*epsilon_f_cons*f_ce(P_e))*(kappa_hf+kappa_cf) )
 
-capitalists_share = kappa_cf*(1+P_e*epsilon_f_cons*f_ce(P_e)) / ( K_e*(k_hat_e+delta_e) + k_hat_f + delta_f + (1+P_e*epsilon_f_cons*f_ce(P_e))*(kappa_hf+kappa_cf) )
+investment_rate = ( K_e*(k_hat_e+delta_e) + k_hat_f + delta_f ) / ( K_e*(k_hat_e+delta_e) + k_hat_f + delta_f + (1+P_e*epsilon_f_cons*f_ce(P_e))*(kappa_hf+kappa_cf) )
 
-matplot(year, cbind(wage_share,s,capitalists_share), type="l", xlab="Time", ylab="Fraction of GDP", main="GDP shares", ylim = c(0,1), col=c(1,2,"blue"))
-legend("topleft", legend = c("wage share","saving rate","capitalists share"), fill= c(1,2,"blue"))
+matplot(year, cbind(wage_share, profit_share, investment_rate), type="l", xlab="Time", ylab="Fraction of GDP", main="", col=c(1,2,3), ylim=c(0,1))
+legend("bottomleft", legend = c("wage share","profit share", "investment rate"), fill= c(1,2,3))
 grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
 
 matplot(year, cbind(lambda_f,lambda_e,lambda), type="l", xlab="", ylab="Fraction of total population", main="Employment level")
 legend("bottomleft", legend = c("Final goods sector", "Energy sector","Total"), fill= c(1,2,3))
 grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
 
-matplot(year, cbind(p_hat_f*100, p_hat_e*100), type="l", xlab="Time", ylab="%", main="Inflation")
+matplot(year, cbind(p_hat_f*100, p_hat_e*100), type="l", xlab="Time", ylab="%", main="Inflation", ylim=c(0,6.5))
 legend("bottomright", legend = c("Final goods price","Energy price"), fill= c(1,2))
 grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
 
@@ -312,15 +313,15 @@ matplot(year, cbind(d_f, d_e), type="l", xlab="Time", ylab="", ylim = c(0,1), ma
 legend("topright", legend = c("Final goods firms", "Energy firms"), fill= c(1,2))
 grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
 
-matplot(year, cbind(k_hat_f, k_hat_e, kappa_hf, kappa_cf), type="l", xlab="Time", ylab="")
+matplot(year, cbind(k_hat_f, k_hat_e, kappa_hf, kappa_cf), type="l", xlab="Time", ylab="", ylim=c(0,0.3))
 legend("topright", legend = c("k_hat_f", "k_hat_e", "kappa_hf", "kappa_cf"), fill= c(1,2,3,4))
 grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
 
-matplot(year, cbind(u_f,u_e,u_f_e,u_e_target), type="l", xlab="Time", ylab="", main="Utilization rates")
+matplot(year, cbind(u_f,u_e,u_f_e,u_e_target), type="l", xlab="Time", ylab="", main="Utilization rates", ylim=c(0,1))
 legend("bottomleft", legend = c("u_f","u_e","u_f_e","u_e_target"), fill= c(1,2,3,4))
 grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
 
-matplot(year, nu_f, type="l", xlab="Time", ylab="", main="Normalized inventory level")
+matplot(year, nu_f, type="l", xlab="Time", ylab="", main="Normalized inventory level", ylim=c(0,0.02))
 legend("bottomleft", legend = c("nu_f"), fill= c(1))
 grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
 
@@ -328,15 +329,15 @@ matplot(year, cbind(uc_f, uc_e), type="l", xlab="Time", ylab="", ylim = c(0,1), 
 legend("bottomright", legend = c("uc_f", "uc_e"), fill= c(1,2))
 grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
 
-matplot(year, cbind(r, r_T), type="l", xlab="Time", ylab="", main="Interest rates")
+matplot(year, cbind(r, r_T), type="l", xlab="Time", ylab="", main="Interest rates", ylim=c(0,0.1))
 legend("bottomright", legend = c("r", "r_T"), fill= c(1,2))
 grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
 
-matplot(year, pi_bu, type="l", xlab="Time", ylab="")
+matplot(year, pi_bu, type="l", xlab="Time", ylab="", ylim=c(0,0.002))
 legend("topleft", legend = c("pi_bu"), fill= c(1))
 grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
 
-matplot(year, of_b, type="l", xlab="Time", ylab="")
+matplot(year, of_b, type="l", xlab="Time", ylab="", ylim=c(0,0.03))
 legend("topleft", legend = c("of_b"), fill= c(1))
 grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
 

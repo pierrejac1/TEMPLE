@@ -1,5 +1,5 @@
 ---
-title: "TEMPLE model: simulation for the second scenario (energy transition) with the alternative, supply-driven version of the model"
+title: "TEMPLE model: simulation of the energy transition scenario with the alternative, supply-driven version of the model"
 author: "Pierre Jacques"
 date: "22/04/2022"
 
@@ -9,9 +9,7 @@ date: "22/04/2022"
 ```{r eval=FALSE, echo=TRUE}
 
 library(deSolve)
-library(rootSolve)
 library(sysde)
-library(scatterplot3d)
 
 tderiv <- c("1",
             "p_5_POP_dot(t+1)",
@@ -160,7 +158,7 @@ intermediateVar <- c(EROI_nre = "1 + A*exp(-B*cum_y_nre)",
                      kappa_cf_target_first = "(1 - s_c) * (div*pi_f_first + r*(d_f+K_e*d_e) - pi_bu)",
                      gamma_e_target_first = "(1-chi)*gamma_nre*7.50/EROI_nre + chi*p_5( chi * k_f / (1-epsilon_e) * (epsilon_f/gamma_f + epsilon_f_cons*f_ce(P_e)*(kappa_hf_target + kappa_cf_target_first)) * 1e-9 ) * (1 + chi/9)",
                      u_e_target_first = "gamma_e_target_first / ((1-epsilon_e)*K_e) * (epsilon_f/gamma_f + epsilon_f_cons*f_ce(P_e)*(kappa_hf_target + kappa_cf_target_first))",
-                     uc_e_target_first = "min(omega_e*gamma_e_target_first/u_e_target_first + epsilon_e + gamma_e_target_first*delta_e/(P_e*u_e_target_first), 0.5496152)", # unit cost of energy production is capped thanks to government subsidies in order to cap inflation in the energy price
+                     uc_e_target_first = "min(omega_e*gamma_e_target_first/u_e_target_first + epsilon_e + gamma_e_target_first*delta_e/(P_e*u_e_target_first), 0.5496152)",
                      pi_e_target = "P_e*u_e_target_first/gamma_e_target_first * (1-uc_e_target_first-T_e0) - 0.01*d_e", # The debt of energy firms is guaranteed by the state so that they benefit from an interest rate of 1%
                      kappa_cf_target = "(1 - s_c) * (div*pi_f_first + K_e*div*pi_e_target + r*(d_f+K_e*d_e) - pi_bu)",
                      gamma_e_target = "(1-chi)*gamma_nre*7.50/EROI_nre + chi*p_5( chi * k_f / (1-epsilon_e) * (epsilon_f/gamma_f + epsilon_f_cons*f_ce(P_e)*(kappa_hf_target + kappa_cf_target)) * 1e-9 ) * (1 + chi/9)",
@@ -179,9 +177,10 @@ intermediateVar <- c(EROI_nre = "1 + A*exp(-B*cum_y_nre)",
                      pi_f = "1/gamma_f*(1-uc_f) - r*d_f",
                      gamma_e = "(1-chi)*gamma_nre*7.50/EROI_nre + chi*p_5( chi * k_f / (1-epsilon_e) * (epsilon_f_crafted/gamma_f + epsilon_f_cons*f_ce(P_e)*(kappa_hf + kappa_cf)) * 1e-9 ) * (1 + chi/9)",
                      u_e = "gamma_e / ((1-epsilon_e)*K_e) * (epsilon_f_crafted/gamma_f + epsilon_f_cons*f_ce(P_e)*(kappa_hf + kappa_cf))",
-                     uc_e = "min(omega_e*gamma_e/u_e + epsilon_e + gamma_e*delta_e/(P_e*u_e), 0.5496152)", # unit cost of energy production is capped thanks to government subsidies in order to cap inflation in the energy price
-                     p_hat_e = "beta_pe * (mu_e*uc_e + T_e0 - 1)",
-                     pi_e = "P_e*u_e/gamma_e * (1-uc_e-T_e0) - 0.01*d_e", # The debt of energy firms is guaranteed by the state so that they benefit from an interest rate of 1%
+                     uc_e = "omega_e*gamma_e/u_e + epsilon_e + gamma_e*delta_e/(P_e*u_e)",
+                     S_e = "max((uc_e-0.5496152)*mu_e, 0)", # Subsidies to the energy firms
+                     p_hat_e = "beta_pe * (mu_e*uc_e + T_e0 - S_e - 1)",
+                     pi_e = "P_e*u_e/gamma_e * (1-uc_e-T_e0+S_e) - 0.01*d_e", # The debt of energy firms is guaranteed by the state so that they benefit from an interest rate of 1%
                      p_hat_f = "beta_pf1 * (mu_f*uc_f - 1)",
                      r_CB = "r_star + p_hat_f + phi*(p_hat_f-p_hat_fT)",
                      r_T = "r_CB + lambda_rT * (mu_b*(d_f+K_e*d_e) - of_b)/(mu_b*(d_f+K_e*d_e))")
@@ -246,9 +245,10 @@ pi_f = 1/gamma_f*(1-uc_f) - r*d_f
 gamma_e = (1-chi)*gamma_nre*7.50/EROI_nre + chi*p_5( chi * k_f / (1-epsilon_e) * (epsilon_f_crafted/gamma_f + epsilon_f_cons*f_ce(P_e)*(kappa_hf + kappa_cf)) * 1e-9 ) * (1 + chi/9)
 u_e = gamma_e / ((1-epsilon_e)*K_e) * (epsilon_f_crafted/gamma_f + epsilon_f_cons*f_ce(P_e)*(kappa_hf + kappa_cf))
 uc_e = omega_e*gamma_e/u_e + epsilon_e + gamma_e*delta_e/(P_e*u_e)
-uc_e = (uc_e < 0.5496152) * uc_e + (uc_e >= 0.5496152) * 0.5496152 # unit cost of energy production is capped thanks to government subsidies in order to cap inflation in the energy price
-p_hat_e = beta_pe * (mu_e*uc_e + T_e0 - 1)
-pi_e = P_e*u_e/gamma_e * (1-uc_e-T_e0) - 0.01*d_e # The debt of energy firms is guaranteed by the state so that they benefit from an interest rate of 1%
+S_e = (uc_e-0.5496152)*mu_e 
+S_e = S_e * (S_e>=0)
+p_hat_e = beta_pe * (mu_e*uc_e + T_e0 - S_e - 1)
+pi_e = P_e*u_e/gamma_e * (1-uc_e-T_e0+S_e) - 0.01*d_e # The debt of energy firms is guaranteed by the state so that they benefit from an interest rate of 1%
 p_hat_f = beta_pf1 * (mu_f*uc_f - 1)
 r_CB = r_star + p_hat_f + phi*(p_hat_f-p_hat_fT)
 r_T = r_CB + lambda_rT * (mu_b*(d_f+K_e*d_e) - of_b)/(mu_b*(d_f+K_e*d_e))
@@ -282,14 +282,14 @@ grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
 matplot(year, mismatch * gamma_f * 100, type="l", xlab="Time", ylab="Percentage of final goods production", main="Mismatch between offer and demand")
 grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
 
-s = ( K_e*(k_hat_e+delta_e) + k_hat_f + delta_f ) / ( K_e*(k_hat_e+delta_e) + k_hat_f + delta_f + (1+P_e*epsilon_f_cons*f_ce(P_e))*(kappa_hf+kappa_cf) )
+wage_share = (kappa_hf + mismatch*5/8) *(1+P_e*epsilon_f_cons*f_ce(P_e)) / ( K_e*(k_hat_e+delta_e) + k_hat_f + delta_f + (1+P_e*epsilon_f_cons*f_ce(P_e))*(kappa_hf+kappa_cf) )
 
-wage_share = kappa_hf*(1+P_e*epsilon_f_cons*f_ce(P_e)) / ( K_e*(k_hat_e+delta_e) + k_hat_f + delta_f + (1+P_e*epsilon_f_cons*f_ce(P_e))*(kappa_hf+kappa_cf) )
+profit_share = ( pi_f + K_e*pi_e ) / ( K_e*(k_hat_e+delta_e) + k_hat_f + delta_f + (1+P_e*epsilon_f_cons*f_ce(P_e))*(kappa_hf+kappa_cf) )
 
-capitalists_share = kappa_cf*(1+P_e*epsilon_f_cons*f_ce(P_e)) / ( K_e*(k_hat_e+delta_e) + k_hat_f + delta_f + (1+P_e*epsilon_f_cons*f_ce(P_e))*(kappa_hf+kappa_cf) )
+investment_rate = ( K_e*(k_hat_e+delta_e) + k_hat_f + delta_f ) / ( K_e*(k_hat_e+delta_e) + k_hat_f + delta_f + (1+P_e*epsilon_f_cons*f_ce(P_e))*(kappa_hf+kappa_cf) )
 
-matplot(year, cbind(wage_share,s,capitalists_share), type="l", xlab="Time", ylab="Fraction of GDP", main="GDP shares", ylim = c(0,1), col=c(1,2,"blue"))
-legend("topleft", legend = c("wage share","saving rate","capitalists share"), fill= c(1,2,"blue"))
+matplot(year, cbind(wage_share, profit_share, investment_rate), type="l", xlab="Time", ylab="Fraction of GDP", main="", col=c(1,2,3), ylim=c(0,1))
+legend("topleft", legend = c("wage share","profit share", "investment rate"), fill= c(1,2,3))
 grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
 
 matplot(year, cbind(lambda_f,lambda_e,lambda), type="l", xlab="", ylab="Fraction of total population", main="Employment level")
@@ -308,27 +308,30 @@ matplot(year, cbind(k_hat_f, k_hat_e, kappa_hf, kappa_cf), type="l", xlab="Time"
 legend("topright", legend = c("k_hat_f", "k_hat_e", "kappa_hf", "kappa_cf"), fill= c(1,2,3,4))
 grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
 
-matplot(year, cbind(uc_f, uc_e), type="l", xlab="Time", ylab="", ylim = c(0,1), main="Unit costs of production")
+matplot(year, cbind(uc_f, uc_e), type="l", xlab="Time", ylab="", main="Unit costs of production", ylim=c(0,5.5))
 legend("bottomright", legend = c("uc_f", "uc_e"), fill= c(1,2))
 grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
 
-matplot(year, cbind(r, r_T), type="l", xlab="Time", ylab="", main="Interest rates")
+matplot(year, cbind(r, r_T), type="l", xlab="Time", ylab="", main="Interest rates", ylim=c(0,0.17))
 legend("bottomright", legend = c("r", "r_T"), fill= c(1,2))
 grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
 
-matplot(year, pi_bu, type="l", xlab="Time", ylab="")
+matplot(year, pi_bu, type="l", xlab="Time", ylab="", ylim=c(0,0.006))
 legend("topleft", legend = c("pi_bu"), fill= c(1))
 grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
 
-matplot(year, of_b, type="l", xlab="Time", ylab="")
+matplot(year, of_b, type="l", xlab="Time", ylab="", ylim=c(0,0.05))
 legend("topleft", legend = c("of_b"), fill= c(1))
 grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
 
-matplot(year, cbind(pi_f, pi_e), type="l", xlab="Time", ylab="", main="Profit rates", ylim = c(-0.05,0.1))
+matplot(year, cbind(pi_f, pi_e), type="l", xlab="Time", ylab="", main="Profit rates", ylim = c(0,0.1))
 legend("topright", legend = c("Final goods firms", "Energy firms"), fill= c(1,2))
 grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
 
 
+matplot(year, S_e, type="l", xlab="Time", ylab="")
+legend("topleft", legend = c("S_e"), fill= c(1))
+grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
 
 ```
 

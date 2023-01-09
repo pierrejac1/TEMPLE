@@ -188,8 +188,10 @@ intermediateVar <- c(EROI_nre = "1 + A*exp(-B*cum_y_nre)",
                      k_hat_e_target = "max(beta_ie * ( u_e_target/u_eT - 1 ), 0)",
                      mismatch = "if (nu_f<=0) { max(K_e*(k_hat_e_target+delta_e) + k_hat_f_target + delta_f + kappa_hf_target + kappa_cf_target - u_f/gamma_f, 0) } else { 0 }",
                      k_hat_f = "k_hat_f_target",
-                     kappa_cf = "kappa_cf_target - mismatch * 3/8",
-                     kappa_hf = "kappa_hf_target - mismatch * 5/8",
+                     forced_savings_capitalists = "mismatch * 3/8",
+                     forced_savings_workers = "mismatch * 5/8",
+                     kappa_cf = "kappa_cf_target - forced_savings_capitalists",
+                     kappa_hf = "kappa_hf_target - forced_savings_workers",
                      k_hat_e = "k_hat_e_target",
                      share_epsilon_f_if = "(k_hat_f + delta_f) * gamma_f/u_f",
                      share_epsilon_f_ie = "(k_hat_e + delta_e) * K_e * gamma_f/u_f",
@@ -260,8 +262,10 @@ k_hat_e_target = k_hat_e_target * (k_hat_e_target > 0)
 mismatch = K_e*(k_hat_e_target+delta_e) + k_hat_f_target + delta_f + kappa_hf_target + kappa_cf_target - u_f/gamma_f
 mismatch = mismatch * (mismatch>=0) * (nu_f<=0)
 k_hat_f = k_hat_f_target
-kappa_cf = kappa_cf_target - mismatch * 3/8
-kappa_hf = kappa_hf_target - mismatch * 5/8
+forced_savings_capitalists = mismatch * 3/8
+forced_savings_workers = mismatch * 5/8
+kappa_cf = kappa_cf_target - forced_savings_capitalists
+kappa_hf = kappa_hf_target - forced_savings_workers
 k_hat_e = k_hat_e_target
 share_epsilon_f_if = (k_hat_f + delta_f) * gamma_f/u_f
 share_epsilon_f_ie = (k_hat_e + delta_e) * K_e * gamma_f/u_f
@@ -307,8 +311,11 @@ y_e = K_e*k_f*u_e/gamma_e*1e-9
 matplot(year, y_e, type="l", xlab="Time", ylab="", main="Energy production")
 grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
 
-matplot(year, mismatch * gamma_f/u_f * 100, type="l", xlab="Time", ylab="Percentage of final goods production", main="Mismatch between offer and demand")
+matplot(year, cbind(mismatch*gamma_f/u_f*100, forced_savings_workers*gamma_f/u_f*100, forced_savings_capitalists*gamma_f/u_f*100), type="l", xlab="Time", ylab="Percentage of final goods production", main="Mismatch between offer and demand")
+legend("bottomright", legend = c("Total mismatch", "Forced savings of workers", "Forced savings of capitalists"), fill= c(1,2,3))
 grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
+
+matplot(year, mismatch * gamma_f/u_f * 100, type="l", xlab="Time", ylab="Percentage of final goods production", main="Mismatch between offer and demand")
 
 wage_share = (kappa_hf + mismatch*5/8) *(1+P_e*epsilon_f_cons*f_ce(P_e)) / ( K_e*(k_hat_e+delta_e) + k_hat_f + delta_f + (1+P_e*epsilon_f_cons*f_ce(P_e))*(kappa_hf+kappa_cf) )
 

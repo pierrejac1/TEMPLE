@@ -311,11 +311,9 @@ y_e = K_e*k_f*u_e/gamma_e*1e-9
 matplot(year, y_e, type="l", xlab="Time", ylab="", main="Energy production")
 grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
 
-matplot(year, cbind(mismatch*gamma_f/u_f*100, forced_savings_workers*gamma_f/u_f*100, forced_savings_capitalists*gamma_f/u_f*100), type="l", xlab="Time", ylab="Percentage of final goods production", main="Mismatch between offer and demand")
+matplot(year, cbind(mismatch*gamma_f/u_f*100, forced_savings_workers*gamma_f/u_f*100, forced_savings_capitalists*gamma_f/u_f*100), type="l", xlab="Time", ylab="Percentage of final goods production", main="Mismatch between supply and demand")
 legend("bottomright", legend = c("Total mismatch", "Forced savings of workers", "Forced savings of capitalists"), fill= c(1,2,3))
 grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
-
-matplot(year, mismatch * gamma_f/u_f * 100, type="l", xlab="Time", ylab="Percentage of final goods production", main="Mismatch between offer and demand")
 
 wage_share = (kappa_hf + mismatch*5/8) *(1+P_e*epsilon_f_cons*f_ce(P_e)) / ( K_e*(k_hat_e+delta_e) + k_hat_f + delta_f + (1+P_e*epsilon_f_cons*f_ce(P_e))*(kappa_hf+kappa_cf) )
 

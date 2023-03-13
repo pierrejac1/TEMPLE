@@ -315,14 +315,16 @@ matplot(year, cbind(mismatch*gamma_f/u_f*100, forced_savings_workers*gamma_f/u_f
 legend("bottomright", legend = c("Total mismatch", "Forced savings of workers", "Forced savings of capitalists"), fill= c(1,2,3))
 grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
 
-wage_share = (kappa_hf + mismatch*5/8) *(1+P_e*epsilon_f_cons*f_ce(P_e)) / ( K_e*(k_hat_e+delta_e) + k_hat_f + delta_f + (1+P_e*epsilon_f_cons*f_ce(P_e))*(kappa_hf+kappa_cf) )
+wage_share = (kappa_hf + forced_savings_workers) *(1+P_e*epsilon_f_cons*f_ce(P_e)) / ( K_e*(k_hat_e+delta_e) + k_hat_f + delta_f + (1+P_e*epsilon_f_cons*f_ce(P_e))*(kappa_hf+kappa_cf) )
+  
+profit_share = ( pi_f + delta_f + r*d_f + K_e*(pi_e+delta_e+r*0.01) ) / ( K_e*(k_hat_e+delta_e) + k_hat_f + delta_f + (1+P_e*epsilon_f_cons*f_ce(P_e))*(kappa_hf+kappa_cf) )
 
-profit_share = ( pi_f + K_e*pi_e ) / ( K_e*(k_hat_e+delta_e) + k_hat_f + delta_f + (1+P_e*epsilon_f_cons*f_ce(P_e))*(kappa_hf+kappa_cf) )
+taxes_and_subsidies_share = K_e*P_e*u_e/gamma_e * (T_e0-S_e) / ( K_e*(k_hat_e+delta_e) + k_hat_f + delta_f + (1+P_e*epsilon_f_cons*f_ce(P_e))*(kappa_hf+kappa_cf))
 
 investment_rate = ( K_e*(k_hat_e+delta_e) + k_hat_f + delta_f ) / ( K_e*(k_hat_e+delta_e) + k_hat_f + delta_f + (1+P_e*epsilon_f_cons*f_ce(P_e))*(kappa_hf+kappa_cf) )
 
-matplot(year, cbind(wage_share, profit_share, investment_rate), type="l", xlab="Time", ylab="Fraction of GDP", main="", col=c(1,2,3), ylim=c(0,1))
-legend("topleft", legend = c("wage share","profit share", "investment rate"), fill= c(1,2,3))
+matplot(year, cbind(wage_share, profit_share, taxes_and_subsidies_share, investment_rate), type="l", xlab="Time", ylab="Fraction of GDP", main="", ylim=c(-0.25,1.25))
+legend("topleft", legend = c("wage share","profit share", "share of taxes and subsidies", "investment rate"), fill=c(1,2,3,4))
 grid(col = "grey54", lty = "dotted", lwd = par("lwd"), equilogs = TRUE)
 
 matplot(year, cbind(lambda_f,lambda_e,lambda), type="l", xlab="", ylab="Fraction of total population", main="Employment level")

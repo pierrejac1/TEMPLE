@@ -4,7 +4,7 @@ Copyright (c) 2022 Pierre Jacques, Devrim Yilmaz and Antoine Godin
 
 ##Overview
 
-The folder contains the model-specific R code employed for running the simulations of the TEMPLE model presented in the paper available [here](https://TO_FILL).
+The folder contains the model-specific R code employed for running the simulations of the TEMPLE model presented in the paper available [here](https://authors.elsevier.com/sd/article/S0921-8009(23)00095-2).
 
 The code requires and builds upon the sysde package, which can be downloaded [here](https://gitlab.com/Stanislasaugier/Applied_Dynamic_Economic_Modelling_R/-/tree/master/sysde/package_sysde) and installed using the following [instructions](https://gitlab.com/Stanislasaugier/Applied_Dynamic_Economic_Modelling_R/-/blob/master/sysde/Tutorials/Goodwin_Linear_tutorial_sysde.pdf).
 
